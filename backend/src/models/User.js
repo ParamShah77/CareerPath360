@@ -153,7 +153,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // ===== INDEXES =====
-userSchema.index({ email: 1 });
+// Note: email index is already created by 'unique: true' in schema definition
 userSchema.index({ 'stats.lastUpdated': 1 });
 
 // ===== PRE-SAVE MIDDLEWARE: Hash Password =====
@@ -227,16 +227,16 @@ userSchema.methods.updateStats = async function(statsData) {
   }
 };
 
-// ✅ NEW: Check if stats need refresh (older than 1 hour)
+// ✅ NEW: Check if stats need refresh (older than 5 minutes for more accurate data)
 userSchema.methods.needsStatsRefresh = function() {
   if (!this.stats || !this.stats.lastUpdated) {
     return true;
   }
   
-  const oneHour = 60 * 60 * 1000;
+  const fiveMinutes = 5 * 60 * 1000; // Changed from 1 hour to 5 minutes
   const timeSinceUpdate = Date.now() - new Date(this.stats.lastUpdated).getTime();
   
-  return timeSinceUpdate > oneHour;
+  return timeSinceUpdate > fiveMinutes;
 };
 
 // ===== STATIC METHOD: Find by Email =====

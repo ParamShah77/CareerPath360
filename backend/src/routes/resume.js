@@ -46,6 +46,9 @@ router.get('/my-resume', auth, resumeController.getMyResume);
 
 // ===== DELETE ROUTES =====
 
+// ✅ CLEANUP old test resumes (must come BEFORE other delete routes)
+router.delete('/cleanup', auth, resumeController.cleanupOldResumes);
+
 // ✅ DELETE all user's uploaded resumes (must come BEFORE /:id route)
 router.delete('/clear/all', auth, async (req, res) => {
   try {

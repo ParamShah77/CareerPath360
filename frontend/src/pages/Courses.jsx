@@ -4,6 +4,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/api';
 
 const Courses = () => {
   const [courses, setCourses] = useState([]);
@@ -25,7 +26,7 @@ const Courses = () => {
 
   const fetchCourses = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/courses');
+      const response = await axios.get(`${API_BASE_URL}/courses`);
       
       if (response.data.status === 'success') {
         setCourses(response.data.data.courses);

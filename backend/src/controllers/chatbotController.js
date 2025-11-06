@@ -52,28 +52,31 @@ exports.sendMessage = async (req, res) => {
     console.log('💬 Chat request from user:', req.user.id);
     console.log('📝 Message:', message.substring(0, 50) + '...');
 
-    // Initialize model with system instructions
+    // Use gemini-2.5-flash - the latest fast model available for this API key
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: SYSTEM_PROMPT
+      model: "gemini-2.5-flash"
     });
 
-    // Build conversation history for context
-    const chat = model.startChat({
-      history: conversationHistory.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      })),
-      generationConfig: {
-        maxOutputTokens: 500,
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40
-      },
-    });
+    // Build context from conversation history
+    let contextMessage = SYSTEM_PROMPT + '\n\n';
+    
+    // Add recent conversation history (last 5 messages for context)
+    const recentHistory = conversationHistory
+      .filter(msg => msg.content !== 'Hi! 👋 I\'m your CareerPath360 AI Assistant. How can I help you today?')
+      .slice(-5);
+    
+    if (recentHistory.length > 0) {
+      contextMessage += 'Recent conversation:\n';
+      recentHistory.forEach(msg => {
+        contextMessage += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+      });
+      contextMessage += '\n';
+    }
+    
+    contextMessage += `User: ${message}\nAssistant:`;
 
-    // Get AI response
-    const result = await chat.sendMessage(message);
+    // Generate response directly without chat session
+    const result = await model.generateContent(contextMessage);
     const response = result.response.text();
 
     console.log('✅ AI response generated');

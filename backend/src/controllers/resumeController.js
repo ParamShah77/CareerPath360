@@ -1,5 +1,6 @@
 const Resume = require('../models/Resume');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -58,6 +59,23 @@ exports.uploadResume = async (req, res) => {
 
     console.log('✅ Resume created in DB:', resume._id);
 
+    // 🔔 Create upload notification
+    try {
+      await Notification.createNotification({
+        userId,
+        type: 'resume_uploaded',
+        title: 'Resume Uploaded Successfully',
+        message: `Your resume "${originalname}" has been uploaded and is being analyzed`,
+        link: `/history`,
+        icon: '📄',
+        metadata: {
+          resumeId: resume._id
+        }
+      });
+    } catch (notifError) {
+      console.error('⚠️ Notification error:', notifError.message);
+    }
+
     // Parse with ML service (async)
     try {
       const formData = new FormData();
@@ -86,6 +104,41 @@ exports.uploadResume = async (req, res) => {
         
         console.log('✅ ML parsing complete');
         console.log('🎯 ATS Score:', mlData.final_ats_score);
+        
+        // 🔔 Create notifications
+        try {
+          // Analysis complete notification
+          await Notification.createNotification({
+            userId,
+            type: 'analysis_complete',
+            title: 'Resume Analysis Complete',
+            message: `Your resume "${originalname}" has been analyzed with an ATS score of ${mlData.final_ats_score}%`,
+            link: `/analysis/${resume._id}`,
+            icon: '✅',
+            metadata: {
+              resumeId: resume._id,
+              atsScore: mlData.final_ats_score
+            }
+          });
+          
+          // High score notification (if score >= 80)
+          if (mlData.final_ats_score >= 80) {
+            await Notification.createNotification({
+              userId,
+              type: 'high_ats_score',
+              title: 'Excellent ATS Score! 🎉',
+              message: `Your resume achieved a high ATS score of ${mlData.final_ats_score}%! Great job!`,
+              link: `/analysis/${resume._id}`,
+              icon: '🎯',
+              metadata: {
+                resumeId: resume._id,
+                atsScore: mlData.final_ats_score
+              }
+            });
+          }
+        } catch (notifError) {
+          console.error('⚠️ Notification error:', notifError.message);
+        }
       }
     } catch (mlError) {
       console.error('❌ ML Error:', mlError.message);
@@ -232,6 +285,24 @@ exports.buildResume = async (req, res) => {
 
     console.log('✅ Resume built and saved:', resume._id);
     console.log('🎯 Initial ATS Score:', atsScore);
+
+    // 🔔 Create resume built notification
+    try {
+      await Notification.createNotification({
+        userId,
+        type: 'resume_built',
+        title: 'Resume Created Successfully',
+        message: `Your resume "${name}" has been created with an ATS score of ${atsScore}%`,
+        link: `/resume-builder?id=${resume._id}`,
+        icon: '📝',
+        metadata: {
+          resumeId: resume._id,
+          atsScore: atsScore
+        }
+      });
+    } catch (notifError) {
+      console.error('⚠️ Notification error:', notifError.message);
+    }
 
     // ✅ UPDATE USER STATS
     try {
@@ -765,6 +836,116 @@ exports.deleteBuiltResume = async (req, res) => {
     return res.status(500).json({
       status: 'error',
       message: 'Error deleting built resume',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// @desc    Cleanup old test resumes
+// @route   DELETE /api/resume/cleanup
+// @access  Private
+exports.cleanupOldResumes = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user.userId;
+    const { beforeDate, keepRecent } = req.query;
+
+    console.log('🧹 Starting resume cleanup for user:', userId);
+
+    let deleteQuery = { userId };
+
+    // Option 1: Delete resumes before a specific date
+    if (beforeDate) {
+      deleteQuery.createdAt = { $lt: new Date(beforeDate) };
+      console.log('📅 Deleting resumes before:', beforeDate);
+    } 
+    // Option 2: Keep only the most recent N resumes
+    else if (keepRecent) {
+      const keepCount = parseInt(keepRecent) || 5;
+      
+      // Get all resumes sorted by date
+      const allResumes = await Resume.find({ userId })
+        .sort({ createdAt: -1 });
+      
+      // Keep the most recent ones, delete the rest
+      const resumesToDelete = allResumes.slice(keepCount);
+      const idsToDelete = resumesToDelete.map(r => r._id);
+      
+      if (idsToDelete.length === 0) {
+        return res.json({
+          status: 'success',
+          message: `No resumes to delete. You have ${allResumes.length} resumes.`,
+          data: {
+            totalResumes: allResumes.length,
+            deleted: 0
+          }
+        });
+      }
+
+      deleteQuery = { 
+        userId,
+        _id: { $in: idsToDelete }
+      };
+      
+      console.log(`🗑️ Keeping ${keepCount} most recent, deleting ${idsToDelete.length} older resumes`);
+    }
+    // Default: Delete all resumes uploaded before November 1, 2025
+    else {
+      deleteQuery.createdAt = { $lt: new Date('2025-11-01') };
+      console.log('📅 Deleting resumes before: 2025-11-01 (default)');
+    }
+
+    // Get resumes to delete (for file cleanup)
+    const resumesToDelete = await Resume.find(deleteQuery);
+    
+    // Delete physical files for uploaded resumes
+    for (const resume of resumesToDelete) {
+      if (!resume.isBuiltResume && resume.fileName) {
+        const filePath = path.join(__dirname, '../../uploads', resume.fileName);
+        try {
+          await fs.unlink(filePath);
+          console.log('✅ File deleted:', resume.fileName);
+        } catch (err) {
+          console.log('⚠️ File not found or already deleted:', resume.fileName);
+        }
+      }
+    }
+
+    // Delete from database
+    const result = await Resume.deleteMany(deleteQuery);
+
+    console.log(`✅ Deleted ${result.deletedCount} resumes`);
+
+    // Force stats refresh
+    try {
+      const user = await User.findById(userId);
+      if (user) {
+        user.stats.lastUpdated = new Date(0);
+        await user.save();
+        console.log('🔄 Stats cache cleared');
+      }
+    } catch (statsError) {
+      console.error('⚠️ Stats refresh error:', statsError.message);
+    }
+
+    res.json({
+      status: 'success',
+      message: `Successfully deleted ${result.deletedCount} resumes`,
+      data: {
+        deleted: result.deletedCount,
+        details: resumesToDelete.map(r => ({
+          id: r._id,
+          name: r.originalName || r.resumeName || r.fileName,
+          date: r.createdAt,
+          type: r.isBuiltResume ? 'built' : 'uploaded'
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Cleanup error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Error cleaning up resumes',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -1828,23 +2009,5 @@ function calculateATSScore(resumeData) {
 }
 
 // ===== EXPORTS - PUT THIS AT THE VERY END =====
-module.exports = {
-  // Upload & Management
-  uploadResume: exports.uploadResume,
-  getAllResumes: exports.getAllResumes,
-  getResumeById: exports.getResumeById,
-  deleteResume: exports.deleteResume,
-  
-  // Builder
-  buildResume: exports.buildResume,
-  updateBuiltResume: exports.updateBuiltResume,
-  getAllBuiltResumes: exports.getAllBuiltResumes,
-  getBuiltResume: exports.getBuiltResume,
-  deleteBuiltResume: exports.deleteBuiltResume,
-  getMyResume: exports.getMyResume,
-  
-  // AI & Export
-  aiOptimizeResume: exports.aiOptimizeResume,
-  exportResumePDF: exports.exportResumePDF,
-  exportResumeHTML: exports.exportResumeHTML // ✅ Add this
-};
+// Note: All exports are already defined as exports.functionName above
+// This module.exports just re-exports them for cleaner imports

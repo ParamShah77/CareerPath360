@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Sparkles, Loader } from 'lucide-react';
 import axios from 'axios';
+import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../utils/api';
 
 const ChatWidget = () => {
+  const location = useLocation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     {
@@ -15,6 +20,10 @@ const ChatWidget = () => {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const messagesEndRef = useRef(null);
+
+  // Hide chatbot on landing page and public routes
+  const publicRoutes = ['/', '/login', '/register'];
+  const isPublicRoute = publicRoutes.includes(location.pathname);
 
   useEffect(() => {
     if (isOpen && suggestions.length === 0) {
@@ -32,7 +41,7 @@ const ChatWidget = () => {
 
   const fetchSuggestions = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/chatbot/suggestions');
+      const response = await axios.get(`${API_BASE_URL}/chatbot/suggestions`);
       if (response.data.status === 'success') {
         setSuggestions(response.data.data.suggestions);
       }
@@ -57,7 +66,7 @@ const ChatWidget = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:5000/api/chatbot/chat',
+        `${API_BASE_URL}/chatbot/message`,
         {
           message: messageText,
           conversationHistory: messages
@@ -102,6 +111,11 @@ const ChatWidget = () => {
       sendMessage();
     }
   };
+
+  // Don't render chatbot on public pages or when user is not logged in
+  if (isPublicRoute || !user) {
+    return null;
+  }
 
   return (
     <>

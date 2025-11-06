@@ -1,5 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/api';
+
+// Helper function to format error messages
+const getErrorMessage = (error) => {
+  if (error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  if (error.response?.status === 401) {
+    return 'Invalid email or password';
+  }
+  if (error.response?.status === 404) {
+    return 'Account not found. Please sign up first.';
+  }
+  if (error.response?.status === 409) {
+    return 'An account with this email already exists';
+  }
+  if (error.response?.status === 500) {
+    return 'Server error. Please try again later.';
+  }
+  if (error.message === 'Network Error') {
+    return 'Cannot connect to server. Please check your internet connection.';
+  }
+  return 'An unexpected error occurred. Please try again.';
+};
 
 const AuthContext = createContext();
 
@@ -25,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔐 Logging in:', email);
       const response = await axios.post(
-        'http://localhost:5000/api/auth/login',
+        `${API_BASE_URL}/auth/login`,
         { email, password }
       );
 
@@ -46,10 +70,11 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
 
       console.log('✅ Login successful, token saved');
-      return response.data;
+      return { success: true, message: 'Login successful!' };
     } catch (error) {
       console.error('❌ Login error:', error.response?.data || error.message);
-      throw error;
+      const errorMessage = getErrorMessage(error);
+      throw new Error(errorMessage);
     }
   };
 
@@ -58,7 +83,7 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('📝 Registering:', email);
       const response = await axios.post(
-        'http://localhost:5000/api/auth/register',
+        `${API_BASE_URL}/auth/register`,
         { name, email, password }
       );
 
@@ -75,10 +100,11 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
 
       console.log('✅ Register successful');
-      return response.data;
+      return { success: true, message: 'Registration successful! Welcome to CareerPath360!' };
     } catch (error) {
       console.error('❌ Register error:', error.response?.data || error.message);
-      throw error;
+      const errorMessage = getErrorMessage(error);
+      throw new Error(errorMessage);
     }
   };
 

@@ -169,6 +169,40 @@
   /* Remove shadows and borders */
   body.printing * {
     box-shadow: none !important;
-    border: none !important;
+  }
+}
+
+/* PDF Export Optimizations */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Prevent page breaks inside important elements */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .resume-section {
+    page-break-inside: avoid;
+  }
+  
+  /* Ensure proper text rendering */
+  * {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }

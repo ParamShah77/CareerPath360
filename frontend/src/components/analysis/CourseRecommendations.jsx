@@ -3,6 +3,7 @@ import { BookOpen, ExternalLink, Star } from 'lucide-react';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
 import axios from 'axios';
+import { API_BASE_URL } from '../../utils/api';
 
 const CourseRecommendations = ({ missingSkills }) => {
   const [courses, setCourses] = useState([]);
@@ -18,7 +19,7 @@ const CourseRecommendations = ({ missingSkills }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://localhost:5000/api/courses/recommendations',
+        `${API_BASE_URL}/courses/recommendations`,
         { skills: missingSkills },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );

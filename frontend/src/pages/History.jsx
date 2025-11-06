@@ -5,6 +5,8 @@ import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { showSuccess, showError } from '../utils/toast';
+import { API_BASE_URL } from '../utils/api';
 
 const History = () => {
   const navigate = useNavigate();
@@ -18,7 +20,7 @@ const History = () => {
   const fetchAnalyses = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/analysis', {
+      const response = await axios.get(`${API_BASE_URL}/analysis`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -38,17 +40,17 @@ const History = () => {
     if (window.confirm('Are you sure you want to delete this analysis?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:5000/api/analysis/${id}`, {
+        await axios.delete(`${API_BASE_URL}/analysis/${id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
         setAnalyses(analyses.filter(a => a._id !== id));
-        alert('Analysis deleted successfully');
+        showSuccess('Analysis deleted successfully');
       } catch (error) {
         console.error('Error deleting analysis:', error);
-        alert('Failed to delete analysis');
+        showError('Failed to delete analysis');
       }
     }
   };

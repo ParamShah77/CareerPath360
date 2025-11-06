@@ -8,6 +8,7 @@ import ChatWidget from './components/chatbot/ChatWidget';
 import { Toaster } from 'sonner';
 
 // Pages
+import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Analysis from './pages/Analysis';
@@ -69,6 +70,9 @@ function App() {
         <Router>
           <Toaster position="top-right" richColors />
           <Routes>
+            {/* Landing Page */}
+            <Route path="/" element={<Landing />} />
+
             {/* Public Routes */}
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
@@ -85,11 +89,8 @@ function App() {
             <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/courses" element={<ProtectedRoute><Layout><Courses /></Layout></ProtectedRoute>} />
 
-            {/* Root redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-            {/* 404 */}
-            <Route path="*" element={<div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark"><div className="text-center"><h1 className="text-6xl font-bold text-primary-500 mb-4">404</h1><p className="text-text-primary-light dark:text-text-primary-dark mb-4">Page Not Found</p><a href="/dashboard" className="text-primary-600">Go back</a></div></div>} />
+            {/* 404 - Redirect to Landing */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <ChatWidget />
         </Router>

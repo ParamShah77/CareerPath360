@@ -29,6 +29,18 @@ const resumeSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+    originalName: {
+      type: String,
+      default: null
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    deleted: {
+      type: Boolean,
+      default: false
+    },
     isBuiltResume: {
       type: Boolean,
       default: false

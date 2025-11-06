@@ -2,31 +2,37 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import NotificationDropdown from '../common/NotificationDropdown';
+import Logo from '../common/Logo';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <nav className="bg-white dark:bg-slate-800 shadow">
+    <nav className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
-            </div>
-            <span className="font-bold text-gray-900 dark:text-white text-lg">CareerPath360.AI</span>
+          <div className="flex items-center">
+            <a href="/dashboard">
+              <Logo size="md" />
+            </a>
           </div>
 
-          {/* Navigation Menu */}
+          {/* Desktop Navigation Menu */}
           <div className="hidden md:flex items-center gap-8">
             <a href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Dashboard
@@ -51,6 +57,7 @@ const Navbar = () => {
             <button
               onClick={toggleTheme}
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
                 <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
@@ -63,16 +70,13 @@ const Navbar = () => {
               )}
             </button>
 
-            {/* Notifications */}
-            <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors relative">
-              <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2a6 6 0 00-6 6v3.586L4.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l2-2a1 1 0 00-1.414-1.414L6 11.586V8a4 4 0 118 0v3.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l2-2a1 1 0 00-1.414-1.414L14 11.586V8a6 6 0 00-6-6zM10 16a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            {/* Notifications - Hidden on mobile */}
+            <div className="hidden sm:block">
+              <NotificationDropdown />
+            </div>
 
-            {/* User Dropdown */}
-            <div className="relative">
+            {/* User Dropdown - Hidden on mobile */}
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="w-10 h-10 bg-teal-600 text-white rounded-full flex items-center justify-center hover:bg-teal-700 transition-colors font-semibold"
@@ -109,8 +113,100 @@ const Navbar = () => {
                 </div>
               )}
             </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-700 py-4">
+            <div className="flex flex-col space-y-3">
+              {/* User Info */}
+              <div className="px-4 py-3 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                <p className="font-semibold text-gray-900 dark:text-white">{user?.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{user?.email}</p>
+              </div>
+
+              {/* Navigation Links */}
+              <a 
+                href="/dashboard" 
+                onClick={closeMobileMenu}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                📊 Dashboard
+              </a>
+              <a 
+                href="/upload" 
+                onClick={closeMobileMenu}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                📤 Analyze Resume
+              </a>
+              <a 
+                href="/history" 
+                onClick={closeMobileMenu}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                📋 History
+              </a>
+              <a 
+                href="/courses" 
+                onClick={closeMobileMenu}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                📚 Courses
+              </a>
+              <a 
+                href="/resume-builder" 
+                onClick={closeMobileMenu}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                ✏️ Resume Builder
+              </a>
+
+              {/* Notifications - Mobile only */}
+              <div className="sm:hidden px-4 py-2">
+                <NotificationDropdown />
+              </div>
+
+              {/* Settings & Logout */}
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3">
+                <a 
+                  href="/settings" 
+                  onClick={closeMobileMenu}
+                  className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  🔒 Settings
+                </a>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    closeMobileMenu();
+                  }}
+                  className="w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  ↩️ Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );

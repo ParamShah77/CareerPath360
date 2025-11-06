@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { toast } from 'sonner';
+import { API_BASE_URL } from '../utils/api';
 
 import './styles.css';
 
@@ -43,6 +44,7 @@ const ResumeBuilder = () => {
   const [showNameModal, setShowNameModal] = useState(false);
   const [activeSection, setActiveSection] = useState('personalInfo');
   const [loading, setLoading] = useState(true);
+  const [atsScore, setAtsScore] = useState(null);
   
   // Available templates
   const templates = [
@@ -212,11 +214,11 @@ const ResumeBuilder = () => {
       console.log('📝 Resume ID from URL:', resumeId);
 
       if (resumeId) {
-        // Load specific resume from history
+        // Load specific resume from history for editing
         await loadResumeFromHistory(resumeId);
       } else {
-        // Load current/most recent resume or start fresh
-        await loadResume();
+        // ✅ Start with empty template - no auto-loading
+        console.log('✨ Starting with fresh resume template');
       }
     } catch (error) {
       console.error('❌ Error loading resume data:', error);
@@ -231,7 +233,7 @@ const ResumeBuilder = () => {
       console.log('📥 Loading most recent resume...');
 
       const response = await axios.get(
-        'http://localhost:5000/api/resume/my-resume',
+        `${API_BASE_URL}/resume/my-resume`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
@@ -264,7 +266,7 @@ const ResumeBuilder = () => {
       let response;
       try {
         response = await axios.get(
-          `http://localhost:5000/api/resume/built/${resumeId}`,
+          `${API_BASE_URL}/resume/built/${resumeId}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
         
@@ -288,7 +290,7 @@ const ResumeBuilder = () => {
       // Fallback to legacy endpoint (old format)
       try {
         response = await axios.get(
-          `http://localhost:5000/api/resume/get/${resumeId}`,
+          `${API_BASE_URL}/resume/get/${resumeId}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
@@ -457,7 +459,7 @@ const ResumeBuilder = () => {
       console.log('🤖 Optimizing resume...');
 
       const response = await axios.post(
-        'http://localhost:5000/api/resume/ai-optimize', // ✅ Correct endpoint
+        `${API_BASE_URL}/resume/ai-optimize`, // ✅ Correct endpoint
         { resumeData },
         {
           headers: {
@@ -468,11 +470,26 @@ const ResumeBuilder = () => {
       );
 
       if (response.data.status === 'success') {
-        setResumeData(response.data.data.optimizedData);
-        setAtsScore(response.data.data.atsScore);
+        const optimized = response.data.data.optimizedData;
+        const score = response.data.data.atsScore;
+        const improvements = response.data.data.improvements || [];
+        
+        // Store original data for comparison
+        setOptimizedData({
+          original: resumeData,
+          optimized: optimized,
+          improvements: improvements
+        });
+        
+        // Update resume data
+        setResumeData(optimized);
+        setAtsScore(score);
+        
+        // Show optimization modal
+        setShowOptimizationModal(true);
         
         toast.success('Resume optimized with AI! 🎉', {
-          description: `ATS Score: ${response.data.data.atsScore}/100`
+          description: `ATS Score: ${score}/100 - ${improvements.length} improvements made`
         });
       }
     } catch (error) {
@@ -535,7 +552,7 @@ const ResumeBuilder = () => {
       if (resumeId) {
         console.log('📝 Updating resume:', resumeId);
         response = await axios.put(
-          `http://localhost:5000/api/resume/built/${resumeId}`,
+          `${API_BASE_URL}/resume/built/${resumeId}`,
           {
             resumeName: resumeName || `${resumeData.personalInfo.fullName}'s Resume`,
             builtResumeData: resumeData,
@@ -546,7 +563,7 @@ const ResumeBuilder = () => {
       } else {
         console.log('🆕 Creating new resume');
         response = await axios.post(
-          'http://localhost:5000/api/resume/build',
+          `${API_BASE_URL}/resume/build`,
           {
             resumeName: resumeName || `${resumeData.personalInfo.fullName}'s Resume`,
             builtResumeData: resumeData,
@@ -603,24 +620,41 @@ const ResumeBuilder = () => {
 
       const fileName = resumeName || `${resumeData.personalInfo.fullName}_Resume`;
 
+      // Wait a moment for any dynamic content to render
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const options = {
-        margin: [0.2, 0.2, 0.2, 0.2],
+        margin: [0.5, 0.5, 0.5, 0.5],  // Add proper margins
         filename: `${fileName.replace(/[^a-z0-9]/gi, '_')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { 
+          type: 'jpeg', 
+          quality: 0.98 
+        },
         html2canvas: { 
           scale: 2,
           useCORS: true,
           letterRendering: true,
-          logging: false
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: element.scrollWidth,  // Use scroll width to capture full content
+          height: element.scrollHeight,
+          windowWidth: element.scrollWidth,
+          windowHeight: element.scrollHeight
         },
         jsPDF: { 
           unit: 'in', 
-          format: 'letter', 
+          format: 'letter',
           orientation: 'portrait',
           compress: true
         },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        pagebreak: { 
+          mode: ['avoid-all', 'css', 'legacy'],
+          avoid: ['h1', 'h2', 'h3']
+        }
       };
+
+      console.log('📄 Exporting PDF...');
+      console.log('📄 Element dimensions:', element.scrollWidth, 'x', element.scrollHeight);
 
       await html2pdf()
         .set(options)
@@ -657,7 +691,7 @@ const ResumeBuilder = () => {
       console.log('📄 Exporting HTML...');
 
       const response = await axios.post(
-        'http://localhost:5000/api/resume/export-html',
+        `${API_BASE_URL}/resume/export-html`,
         {
           resumeData,
           template: selectedTemplate
@@ -985,9 +1019,7 @@ const ResumeBuilder = () => {
       <OptimizationModal
         isOpen={showOptimizationModal}
         onClose={() => setShowOptimizationModal(false)}
-        originalData={resumeData}
-        optimizedData={optimizedData}
-        onApply={handleApplyOptimization}
+        optimizationData={optimizedData}
       />
     </div>
   );

@@ -5,6 +5,8 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { showSuccess, showError, showWarning, showInfo } from '../utils/toast';
+import { API_BASE_URL } from '../utils/api';
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -21,7 +23,7 @@ const Upload = () => {
 
   const fetchJobRoles = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/job-roles');
+      const response = await axios.get(`${API_BASE_URL}/job-roles`);
       if (response.data.status === 'success') {
         setJobRoles(response.data.data.jobRoles);
       }
@@ -36,18 +38,19 @@ const Upload = () => {
       // Validate file type
       const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
       if (!allowedTypes.includes(selectedFile.type)) {
-        alert('Please upload a PDF or DOCX file');
+        showWarning('Please upload a PDF or DOCX file');
         return;
       }
 
       // Validate file size (5MB max)
       if (selectedFile.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
+        showWarning('File size must be less than 5MB');
         return;
       }
 
       setFile(selectedFile);
       setUploadStatus(null);
+      showInfo(`File "${selectedFile.name}" selected successfully`);
     }
   };
 
@@ -68,17 +71,18 @@ const Upload = () => {
     e.preventDefault();
     
     if (!file) {
-      alert('Please upload a resume file');
+      showWarning('Please upload a resume file');
       return;
     }
 
     if (!selectedRole) {
-      alert('Please select a target job role');
+      showWarning('Please select a target job role');
       return;
     }
 
     setUploading(true);
     setUploadStatus('uploading');
+    showInfo('Uploading resume...');
 
     try {
       const token = localStorage.getItem('token');
@@ -88,7 +92,7 @@ const Upload = () => {
       formData.append('resume', file);
 
       const uploadResponse = await axios.post(
-        'http://localhost:5000/api/resume/upload',
+        `${API_BASE_URL}/resume/upload`,
         formData,
         {
           headers: {
@@ -102,10 +106,11 @@ const Upload = () => {
         const resumeId = uploadResponse.data.data.resume.id;
         
         setUploadStatus('analyzing');
+        showInfo('Analyzing resume with AI...');
 
         // Step 2: Create analysis
         const analysisResponse = await axios.post(
-          'http://localhost:5000/api/analysis',
+          `${API_BASE_URL}/analysis`,
           {
             resumeId: resumeId,
             targetJobRoleId: selectedRole
@@ -121,11 +126,11 @@ const Upload = () => {
           setUploadStatus('success');
           setAnalysisResult(analysisResponse.data.data.analysis);
           
-          // Show ATS score in alert
+          // Show ATS score in toast
           const atsScore = analysisResponse.data.data.analysis.feedback?.atsScore || 'N/A';
           const matchPercentage = analysisResponse.data.data.analysis.matchPercentage;
           
-          alert(`Analysis complete!\n\nATS Score: ${atsScore}%\nJob Match: ${matchPercentage}%`);
+          showSuccess(`Analysis complete! ATS Score: ${atsScore}% | Job Match: ${matchPercentage}%`);
           
           // Navigate to analysis page
           navigate('/analysis', { 
@@ -139,7 +144,7 @@ const Upload = () => {
     } catch (error) {
       setUploadStatus('error');
       console.error('Upload/Analysis error:', error);
-      alert(error.response?.data?.message || 'Something went wrong. Please try again.');
+      showError(error.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
       setUploading(false);
     }

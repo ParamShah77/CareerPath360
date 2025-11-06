@@ -5,6 +5,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import Button from '../components/common/Button';
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/api';
 
 const Analysis = () => {
   const location = useLocation();
@@ -25,7 +26,7 @@ const Analysis = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `http://localhost:5000/api/analysis/${analysisId}`,
+        `${API_BASE_URL}/analysis/${analysisId}`,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 

@@ -35,6 +35,7 @@ const courseRoutes = require('./routes/course');
 const chatbotRoutes = require('./routes/chatbot');
 const builderRoutes = require('./routes/builder');
 const aiRoutes = require('./routes/ai');
+const notificationRoutes = require('./routes/notification');
 
 // ===== REGISTER ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -47,6 +48,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/builder', builderRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {
@@ -66,7 +68,8 @@ app.get('/', (req, res) => {
       courses: '/api/courses',
       chatbot: '/api/chatbot',
       builder: '/api/builder',
-      ai: '/api/ai'
+      ai: '/api/ai',
+      notifications: '/api/notifications'
     }
   });
 });

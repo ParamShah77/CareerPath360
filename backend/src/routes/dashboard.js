@@ -6,6 +6,9 @@ const { auth } = require('../middleware/auth');
 // Dashboard statistics
 router.get('/stats', auth, dashboardController.getDashboardStats);
 
+// Force refresh dashboard stats
+router.post('/stats/refresh', auth, dashboardController.refreshDashboardStats);
+
 // Recent activity
 router.get('/activity', auth, dashboardController.getRecentActivity);
 

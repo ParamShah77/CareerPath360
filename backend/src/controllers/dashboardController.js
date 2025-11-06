@@ -31,9 +31,13 @@ exports.getDashboardStats = async (req, res) => {
       });
     }
 
-    // ✅ Check if cached stats are fresh (< 1 hour old)
-    if (user.stats && !user.needsStatsRefresh()) {
-      console.log('📊 Returning cached stats (fresh)');
+    // ✅ Check if force refresh is requested via query param
+    const forceRefresh = req.query.refresh === 'true';
+    
+    // ✅ Check if cached stats are fresh (< 5 minutes old)
+    if (user.stats && !user.needsStatsRefresh() && !forceRefresh) {
+      console.log('📊 Returning cached stats (fresh, age:', 
+        Math.round((Date.now() - new Date(user.stats.lastUpdated).getTime()) / 1000), 'seconds)');
       return res.json({
         status: 'success',
         data: user.stats,
@@ -43,7 +47,7 @@ exports.getDashboardStats = async (req, res) => {
     }
 
     // ✅ Calculate fresh stats if cache is stale or doesn't exist
-    console.log('🔄 Calculating fresh stats from database...');
+    console.log('🔄 Calculating fresh stats from database...', forceRefresh ? '(FORCE REFRESH)' : '');
 
     // Get ONLY uploaded resumes (not built) AND not deleted
     const uploadedResumes = await Resume.find({
@@ -68,6 +72,18 @@ exports.getDashboardStats = async (req, res) => {
     const totalResumes = uploadedResumes.length;
     console.log('📄 Total uploaded resumes:', totalResumes);
     console.log('🔨 Total built resumes:', builtResumes.length);
+    
+    // Debug: Log resume details to find the issue
+    console.log('🔍 DEBUG - Uploaded resume names:', uploadedResumes.map(r => ({
+      name: r.originalName || r.resumeName || r.fileName,
+      date: r.uploadedAt || r.createdAt,
+      id: r._id
+    })));
+    console.log('🔍 DEBUG - Built resume names:', builtResumes.map(r => ({
+      name: r.originalName || r.resumeName || r.fileName,
+      date: r.createdAt,
+      id: r._id
+    })));
 
     // ✅ Calculate average ATS score from uploaded resumes
     const scores = uploadedResumes
