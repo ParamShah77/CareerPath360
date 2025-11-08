@@ -211,11 +211,11 @@ exports.refreshDashboardStats = async (req, res) => {
       });
     }
 
-    // Reset lastUpdated to force recalculation
-    if (user.stats) {
-      user.stats.lastUpdated = new Date(0); // Set to epoch
-      await user.save();
-    }
+    // Completely remove stats to force recalculation
+    user.stats = undefined;
+    await user.save();
+
+    console.log('✅ Stats cache cleared, recalculating...');
 
     // Call getDashboardStats to recalculate
     return exports.getDashboardStats(req, res);

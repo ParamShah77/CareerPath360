@@ -36,6 +36,7 @@ const chatbotRoutes = require('./routes/chatbot');
 const builderRoutes = require('./routes/builder');
 const aiRoutes = require('./routes/ai');
 const notificationRoutes = require('./routes/notification');
+const jobMatchingRoutes = require('./routes/jobMatching');
 
 // ===== REGISTER ROUTES =====
 app.use('/api/auth', authRoutes);
@@ -49,6 +50,11 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/builder', builderRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/job-matching', jobMatchingRoutes);
+
+// ===== ANALYTICS ROUTES =====
+const analyticsRoutes = require('./routes/analytics');
+app.use('/api/analytics', analyticsRoutes);
 
 // ===== ROOT ENDPOINT =====
 app.get('/', (req, res) => {
@@ -69,7 +75,9 @@ app.get('/', (req, res) => {
       chatbot: '/api/chatbot',
       builder: '/api/builder',
       ai: '/api/ai',
-      notifications: '/api/notifications'
+      notifications: '/api/notifications',
+      jobMatching: '/api/job-matching',
+      analytics: '/api/analytics'
     }
   });
 });

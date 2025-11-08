@@ -14,8 +14,27 @@ const resumeSchema = new mongoose.Schema(
     },
     template: {
       type: String,
-      enum: ['minimal-jake', 'techy-modern', 'classic', 'professional'],
-      default: 'minimal-jake'
+      enum: [
+        'classic',
+        'minimal-jake',
+        'techy-modern',
+        'student-fresher',
+        'project-based',
+        'data-science',
+        'developer',
+        'business-analyst',
+        'designer',
+        'senior-professional',
+        'marketing',
+        'hr',
+        'sales',
+        'teaching',
+        'finance',
+        'operations',
+        'healthcare',
+        'professional' // Legacy compatibility
+      ],
+      default: 'classic'
     },
     atsScore: {
       type: Number,
@@ -68,8 +87,27 @@ const resumeSchema = new mongoose.Schema(
     },
     selectedTemplate: {
       type: String,
-      enum: ['minimal-jake', 'techy-modern', 'classic', 'professional'],
-      default: 'minimal-jake'
+      enum: [
+        'classic',
+        'minimal-jake',
+        'techy-modern',
+        'student-fresher',
+        'project-based',
+        'data-science',
+        'developer',
+        'business-analyst',
+        'designer',
+        'senior-professional',
+        'marketing',
+        'hr',
+        'sales',
+        'teaching',
+        'finance',
+        'operations',
+        'healthcare',
+        'professional' // Legacy compatibility
+      ],
+      default: 'classic'
     }
   },
   {

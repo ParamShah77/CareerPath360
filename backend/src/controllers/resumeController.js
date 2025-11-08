@@ -762,12 +762,12 @@ exports.deleteResume = async (req, res) => {
 
     console.log('✅ Resume deleted:', req.params.id);
 
-    // ✅ REFRESH USER STATS
+    // ✅ REFRESH USER STATS - Clear cache completely
     try {
       const user = await User.findById(userId);
       if (user) {
-        console.log('🔄 Forcing stats refresh after delete...');
-        user.stats.lastUpdated = new Date(0); // Force refresh on next stats request
+        console.log('🔄 Clearing stats cache after delete...');
+        user.stats = undefined; // Clear stats completely to force recalculation
         await user.save();
       }
     } catch (statsError) {
@@ -813,12 +813,12 @@ exports.deleteBuiltResume = async (req, res) => {
 
     console.log('✅ Built resume deleted:', id);
 
-    // ✅ REFRESH USER STATS
+    // ✅ REFRESH USER STATS - Clear cache completely
     try {
       const user = await User.findById(userId);
       if (user) {
-        console.log('🔄 Forcing stats refresh after delete...');
-        user.stats.lastUpdated = new Date(0); // Force refresh
+        console.log('🔄 Clearing stats cache after delete...');
+        user.stats = undefined; // Clear stats completely to force recalculation
         await user.save();
       }
     } catch (statsError) {
