@@ -83,13 +83,18 @@ exports.uploadResume = async (req, res) => {
 
       console.log('🤖 Calling ML service...');
 
-      const mlUrl = `${process.env.ML_SERVICE_URL || 'http://localhost:8000'}/parse-resume`;
+      // Normalize ML service base URL (remove trailing slashes) and build endpoint
+      const mlBase = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/,'');
+      const mlUrl = `${mlBase}/parse-resume`;
+      console.log('➡️ Calling ML service at:', mlUrl);
+
       const mlResponse = await axios.post(
         mlUrl,
         formData,
         {
           headers: formData.getHeaders(),
-          timeout: 30000,
+          // ML parsing can take longer on cold starts or large files - increase timeout
+          timeout: 120000,
           maxContentLength: Infinity,
           maxBodyLength: Infinity
         }

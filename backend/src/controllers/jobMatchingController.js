@@ -199,14 +199,19 @@ exports.analyzeWithUpload = async (req, res) => {
         contentType: file.mimetype
       });
 
+      // Normalize ML service base URL and call parse endpoint
+      const mlBase = (process.env.ML_SERVICE_URL || 'http://localhost:8000').replace(/\/+$/,'');
+      const mlUrl = `${mlBase}/parse-resume`;
+      console.log('➡️ Calling ML service at:', mlUrl);
+
       const mlResponse = await axios.post(
-        `${process.env.ML_SERVICE_URL || 'http://localhost:8000'}/parse-resume`,
+        mlUrl,
         formData,
         {
           headers: {
             ...formData.getHeaders()
           },
-          timeout: 60000,
+          timeout: 120000,
           maxContentLength: Infinity,
           maxBodyLength: Infinity
         }
