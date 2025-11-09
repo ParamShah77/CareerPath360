@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import NotificationDropdown from '../common/NotificationDropdown';
@@ -27,28 +27,28 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <a href="/dashboard">
+            <Link to="/dashboard">
               <Logo size="md" />
-            </a>
+            </Link>
           </div>
 
           {/* Desktop Navigation Menu */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+            <Link to="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Dashboard
-            </a>
-            <a href="/upload" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+            </Link>
+            <Link to="/upload" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Analyze Resume
-            </a>
-            <a href="/history" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+            </Link>
+            <Link to="/history" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               History
-            </a>
-            <a href="/courses" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+            </Link>
+            <Link to="/courses" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Courses
-            </a>
-            <a href="/resume-builder" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
+            </Link>
+            <Link to="/resume-builder" className="text-gray-700 dark:text-gray-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors">
               Resume Builder
-            </a>
+            </Link>
           </div>
 
           {/* Right Section */}
@@ -93,13 +93,13 @@ const Navbar = () => {
                   </div>
 
                   {/* Only Settings option (no Profile Settings) */}
-                  <a
-                    href="/settings"
+                  <Link
+                    to="/settings"
                     onClick={() => setDropdownOpen(false)}
                     className="block w-full text-left px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     🔒 Settings
-                  </a>
+                  </Link>
 
                   <button
                     onClick={() => {
@@ -144,41 +144,41 @@ const Navbar = () => {
               </div>
 
               {/* Navigation Links */}
-              <a 
-                href="/dashboard" 
+              <Link 
+                to="/dashboard" 
                 onClick={closeMobileMenu}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 📊 Dashboard
-              </a>
-              <a 
-                href="/upload" 
+              </Link>
+              <Link 
+                to="/upload" 
                 onClick={closeMobileMenu}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 📤 Analyze Resume
-              </a>
-              <a 
-                href="/history" 
+              </Link>
+              <Link 
+                to="/history" 
                 onClick={closeMobileMenu}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 📋 History
-              </a>
-              <a 
-                href="/courses" 
+              </Link>
+              <Link 
+                to="/courses" 
                 onClick={closeMobileMenu}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 📚 Courses
-              </a>
-              <a 
-                href="/resume-builder" 
+              </Link>
+              <Link 
+                to="/resume-builder" 
                 onClick={closeMobileMenu}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 ✏️ Resume Builder
-              </a>
+              </Link>
 
               {/* Notifications - Mobile only */}
               <div className="sm:hidden px-4 py-2">
@@ -187,13 +187,13 @@ const Navbar = () => {
 
               {/* Settings & Logout */}
               <div className="border-t border-slate-200 dark:border-slate-700 pt-3 mt-3">
-                <a 
-                  href="/settings" 
+                <Link 
+                  to="/settings" 
                   onClick={closeMobileMenu}
                   className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   🔒 Settings
-                </a>
+                </Link>
                 <button
                   onClick={() => {
                     handleLogout();
