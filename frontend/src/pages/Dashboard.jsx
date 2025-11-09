@@ -385,15 +385,15 @@ const Dashboard = () => {
               </p>
             </div>
             {recentAnalyses.length > 0 && (
-              <a 
-                href="/history" 
+              <Link
+                to="/history"
                 className="px-5 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#13A8A8] to-[#18B3B3] text-white rounded-xl font-semibold hover:shadow-lg transition-all inline-flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 View All
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
-              </a>
+              </Link>
             )}
           </div>
 
@@ -417,12 +417,12 @@ const Dashboard = () => {
                 <p className="text-gray-600 dark:text-slate-400 text-xs sm:text-sm mb-4 sm:mb-6 px-4">
                   Upload your first resume to get started with AI-powered analysis
                 </p>
-                <a 
-                  href="/upload" 
+                <Link
+                  to="/upload"
                   className="inline-block px-5 py-2.5 sm:px-6 sm:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-sm sm:text-base"
                 >
                   Upload Resume
-                </a>
+                </Link>
               </div>
             ) : (
               <div className="space-y-3">
@@ -433,8 +433,9 @@ const Dashboard = () => {
                       key={analysis._id || `analysis-${index}`}
                       className="group relative border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:bg-gray-100 dark:hover:bg-slate-700/50 transition-colors"
                     >
-                      <a
-                        href="/analysis"
+                      <Link
+                        to="/analysis"
+                        state={{ analysisId: analysis._id }}
                         className="flex items-center justify-between gap-4"
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -456,7 +457,7 @@ const Dashboard = () => {
                           </div>
                           <p className="text-xs text-gray-600 dark:text-slate-400 mt-1 whitespace-nowrap">ATS Score</p>
                         </div>
-                      </a>
+                      </Link>
                       
                       {/* Delete Button - appears on hover */}
                       <button
