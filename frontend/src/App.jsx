@@ -16,6 +16,7 @@ import History from './pages/History';
 import ResumeBuilder from './pages/ResumeBuilder';
 import ResumeHistory from './pages/ResumeHistory';
 import Settings from './pages/Settings'; // ✅ Only one settings import
+import ProfileSettings from './pages/ProfileSettings';
 import JobMatching from './pages/JobMatching';
 import Analytics from './pages/Analytics';
 import Login from './pages/Login';
@@ -95,7 +96,7 @@ function App() {
             <Route path="/resume-history" element={<ProtectedRoute><Layout><ResumeHistory /></Layout></ProtectedRoute>} />
             <Route path="/job-matching" element={<ProtectedRoute><Layout><JobMatching /></Layout></ProtectedRoute>} />
             <Route path="/analytics" element={<ProtectedRoute><Layout><Analytics /></Layout></ProtectedRoute>} />
-            <Route path="/profile-settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+            <Route path="/profile-settings" element={<ProtectedRoute><Layout><ProfileSettings /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/courses" element={<ProtectedRoute><Layout><Courses /></Layout></ProtectedRoute>} />
 
