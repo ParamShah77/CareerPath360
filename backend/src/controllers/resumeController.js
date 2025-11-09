@@ -83,12 +83,15 @@ exports.uploadResume = async (req, res) => {
 
       console.log('🤖 Calling ML service...');
 
+      const mlUrl = `${process.env.ML_SERVICE_URL || 'http://localhost:8000'}/parse-resume`;
       const mlResponse = await axios.post(
-        'http://localhost:8000/parse-resume',
+        mlUrl,
         formData,
         {
           headers: formData.getHeaders(),
-          timeout: 30000
+          timeout: 30000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
         }
       );
 
@@ -141,9 +144,18 @@ exports.uploadResume = async (req, res) => {
         }
       }
     } catch (mlError) {
-      console.error('❌ ML Error:', mlError.message);
+      // Log detailed ML error for easier debugging in deployed environments
+      if (mlError.response) {
+        console.error('❌ ML Error:', mlError.response.status, mlError.response.data);
+        resume.parseError = `${mlError.response.status} ${JSON.stringify(mlError.response.data)}`;
+      } else if (mlError.request) {
+        console.error('❌ ML Error: No response received', mlError.request);
+        resume.parseError = 'No response received from ML service';
+      } else {
+        console.error('❌ ML Error:', mlError.message);
+        resume.parseError = mlError.message;
+      }
       resume.parseStatus = 'failed';
-      resume.parseError = mlError.message;
       await resume.save();
     }
 
