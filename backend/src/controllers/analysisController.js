@@ -2,6 +2,7 @@ const Analysis = require('../models/Analysis');
 const Resume = require('../models/Resume');
 const JobRole = require('../models/JobRole');
 const Course = require('../models/Course');
+const { applyFallbackParsing } = require('../services/fallbackResumeAnalyzer');
 
 exports.createAnalysis = async (req, res) => {
   try {
@@ -37,6 +38,8 @@ exports.createAnalysis = async (req, res) => {
     }
 
     console.log('✅ Found resume and job role');
+
+    await ensureResumeSkills(resume);
 
     // FIX: Use extracted_skills (from ML service)
     const resumeSkills = resume.parsedData?.extracted_skills || [];
@@ -270,3 +273,22 @@ exports.deleteAnalysis = async (req, res) => {
     });
   }
 };
+
+async function ensureResumeSkills(resume) {
+  if (!resume) return;
+  if (resume.parsedData?.extracted_skills?.length) {
+    return;
+  }
+
+  if (!resume.filePath) {
+    console.warn('⚠️ Resume missing file path, cannot hydrate skills');
+    return;
+  }
+
+  try {
+    await applyFallbackParsing(resume);
+    console.log('✅ Resume skills hydrated via fallback analyzer');
+  } catch (error) {
+    console.error('⚠️ Unable to hydrate resume skills:', error.message);
+  }
+}

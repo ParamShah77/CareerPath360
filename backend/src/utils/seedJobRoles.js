@@ -1,6 +1,7 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 const JobRole = require('../models/JobRole');
-require('dotenv').config();
+const getMongoUri = require('../config/getMongoUri');
 
 const jobRoles = [
   {
@@ -128,7 +129,8 @@ const jobRoles = [
 const seedJobRoles = async () => {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = getMongoUri();
+    await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
 
     // Clear existing job roles

@@ -3,10 +3,12 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Resume = require('./src/models/Resume');
 const User = require('./src/models/User');
+const getMongoUri = require('./src/config/getMongoUri');
 
 async function deleteOldResumes() {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    const mongoUri = getMongoUri();
+    await mongoose.connect(mongoUri);
     console.log('📊 Connected to MongoDB');
 
     const user = await User.findOne({ email: 'param.shah.0090@gmail.com' });

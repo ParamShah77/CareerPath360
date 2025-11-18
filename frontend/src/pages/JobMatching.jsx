@@ -1,8 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Briefcase, ExternalLink, TrendingUp, TrendingDown, BookOpen, CheckCircle, XCircle, Lightbulb, Award, ArrowLeft, Trash2, Upload, FileText } from 'lucide-react';
+import { Briefcase, ExternalLink, TrendingUp, TrendingDown, BookOpen, CheckCircle, XCircle, Lightbulb, Award, ArrowLeft, Trash2, Upload, FileText, Target, PieChart } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
+
+const BREAKDOWN_CONFIG = [
+  { key: 'requiredSkills', label: 'Required Skills', max: 40 },
+  { key: 'preferredSkills', label: 'Preferred Skills', max: 20 },
+  { key: 'experience', label: 'Experience Alignment', max: 20 },
+  { key: 'skillDepth', label: 'Skill Depth & Context', max: 10 },
+  { key: 'industryRelevance', label: 'Industry Relevance', max: 10 }
+];
+
+const GRADE_DESCRIPTIONS = {
+  Excellent: 'Excellent – top-tier alignment. Apply immediately.',
+  Good: 'Good – minor tweaks will make this irresistible.',
+  Fair: 'Fair – strengthen highlighted gaps before applying.',
+  Weak: 'Weak – notable gaps detected. Upskill recommended.',
+  Poor: 'Poor – not the best use of time right now.'
+};
+
+const gradeBadgeStyles = {
+  Excellent: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  Good: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  Fair: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  Weak: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  Poor: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+};
+
+const getGradeBadgeClasses = (grade) =>
+  `px-3 py-1 rounded-full text-xs font-semibold ${
+    gradeBadgeStyles[grade] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+  }`;
 
 const JobMatching = () => {
   const navigate = useNavigate();
@@ -406,9 +435,16 @@ const JobMatching = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className={`text-2xl font-bold ${getMatchColor(item.matchScore)}`}>
-                      {item.matchScore}%
-                    </span>
+                    <div className="text-right">
+                      <span className={`text-2xl font-bold ${getMatchColor(item.matchScore)}`}>
+                        {item.matchScore}%
+                      </span>
+                      {item.matchGrade && (
+                        <p className="text-sm mt-1">
+                          <span className={getGradeBadgeClasses(item.matchGrade)}>{item.matchGrade}</span>
+                        </p>
+                      )}
+                    </div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -434,12 +470,74 @@ const JobMatching = () => {
               <div className={`text-6xl font-bold ${getMatchColor(analysis.matchScore)} mb-4`}>
                 {analysis.matchScore}%
               </div>
-              <p className="text-gray-700 dark:text-gray-300 text-lg">
-                {analysis.matchScore >= 80 && 'Excellent match! You\'re a strong candidate.'}
-                {analysis.matchScore >= 60 && analysis.matchScore < 80 && 'Good match! With some improvements, you could be perfect.'}
-                {analysis.matchScore >= 40 && analysis.matchScore < 60 && 'Moderate match. Focus on building missing skills.'}
-                {analysis.matchScore < 40 && 'Consider building more skills before applying.'}
+              {analysis.matchGrade && (
+                <p className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                  Match Grade: <span className="uppercase tracking-wide">{analysis.matchGrade}</span>
+                </p>
+              )}
+              {typeof analysis.atsScoreSnapshot === 'number' && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  ATS Score: <span className="font-semibold">{analysis.atsScoreSnapshot}%</span>
+                  {analysis.atsScoreSource && (
+                    <span className="text-sm text-gray-500 dark:text-gray-400"> ({analysis.atsScoreSource})</span>
+                  )}
+                </p>
+              )}
+              <p className="text-gray-700 dark:text-gray-300 text-lg mt-3">
+                {GRADE_DESCRIPTIONS[analysis.matchGrade] ||
+                  (analysis.matchScore >= 60
+                    ? 'Solid match! Tailor your story to stand out.'
+                    : 'Moderate match. Focus on building missing skills.')}
               </p>
+            </div>
+
+            {/* Breakdown + Insights */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {analysis.matchBreakdown && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <PieChart className="w-6 h-6 text-blue-600" />
+                    Score Breakdown
+                  </h2>
+                  <div className="space-y-4">
+                    {BREAKDOWN_CONFIG.map((section) => {
+                      const value = analysis.matchBreakdown?.[section.key] || 0;
+                      const percent = Math.min(100, Math.round((value / section.max) * 100));
+                      return (
+                        <div key={section.key}>
+                          <div className="flex justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            <span>{section.label}</span>
+                            <span>{value}/{section.max}</span>
+                          </div>
+                          <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full">
+                            <div
+                              className="h-3 rounded-full bg-blue-500 dark:bg-blue-400"
+                              style={{ width: `${percent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {analysis.matchInsights?.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Target className="w-6 h-6 text-indigo-600" />
+                    Match Insights
+                  </h2>
+                  <ul className="space-y-3">
+                    {analysis.matchInsights.map((insight, index) => (
+                      <li key={index} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
+                        <span className="text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Job Details */}
@@ -451,6 +549,12 @@ const JobMatching = () => {
                 {analysis.location && <p><span className="font-semibold dark:text-gray-300">Location:</span> <span className="dark:text-gray-400">{analysis.location}</span></p>}
                 {analysis.experience && <p><span className="font-semibold dark:text-gray-300">Experience:</span> <span className="dark:text-gray-400">{analysis.experience}</span></p>}
                 {analysis.salary && <p><span className="font-semibold dark:text-gray-300">Salary:</span> <span className="dark:text-gray-400">{analysis.salary}</span></p>}
+                {analysis.jobBoard && (
+                  <p><span className="font-semibold dark:text-gray-300">Job Board:</span> <span className="dark:text-gray-400">{analysis.jobBoard}</span></p>
+                )}
+                {analysis.scrapeStrategy && (
+                  <p><span className="font-semibold dark:text-gray-300">Scrape Method:</span> <span className="dark:text-gray-400 capitalize">{analysis.scrapeStrategy}</span></p>
+                )}
                 <a
                   href={analysis.jobUrl}
                   target="_blank"

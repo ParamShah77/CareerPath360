@@ -6,6 +6,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
+const { applyFallbackParsing } = require('../services/fallbackResumeAnalyzer');
 
 // ====================================
 // 📤 RESUME UPLOAD & PARSING
@@ -48,6 +49,7 @@ exports.uploadResume = async (req, res) => {
     const resume = await Resume.create({
       userId: userId,
       fileName: fileName,
+      filePath: filePath,
       originalName: originalname,
       fileUrl: `/uploads/${fileName}`,
       fileSize: size,
@@ -162,6 +164,18 @@ exports.uploadResume = async (req, res) => {
       }
       resume.parseStatus = 'failed';
       await resume.save();
+    }
+
+    if (
+      resume.parseStatus !== 'completed' ||
+      !(resume.parsedData?.extracted_skills?.length)
+    ) {
+      try {
+        const fallbackData = await applyFallbackParsing(resume);
+        console.log('✅ Fallback parsing completed with ATS:', fallbackData.final_ats_score);
+      } catch (fallbackError) {
+        console.error('⚠️ Fallback parsing error:', fallbackError.message);
+      }
     }
 
     // ✅ UPDATE USER STATS
@@ -300,6 +314,12 @@ exports.buildResume = async (req, res) => {
       aiOptimized: false
     });
 
+    try {
+      await applyFallbackParsing(resume);
+    } catch (fallbackError) {
+      console.warn('⚠️ Fallback parsing for built resume failed:', fallbackError.message);
+    }
+
     console.log('✅ Resume built and saved:', resume._id);
     console.log('🎯 Initial ATS Score:', atsScore);
 
@@ -426,6 +446,12 @@ exports.updateBuiltResume = async (req, res) => {
       const atsScore = calculateATSScore(builtResumeData);
       resume.atsScore = atsScore;
       console.log('🎯 Updated ATS Score:', atsScore);
+
+      try {
+        await applyFallbackParsing(resume);
+      } catch (fallbackError) {
+        console.warn('⚠️ Fallback parsing during update failed:', fallbackError.message);
+      }
     }
     
     if (selectedTemplate) {

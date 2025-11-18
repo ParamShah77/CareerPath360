@@ -73,7 +73,13 @@ temp/
 tmp/
 *.tmp
 backend/uploads/
+backend/uploads/**/*
 frontend/build/
+ml-service/uploads/
+# Ignore uploaded resume PDFs, but keep documentation PDFs
+backend/uploads/**/*.pdf
+backend/uploads/**/*.docx
+backend/uploads/**/*.doc
 
 # ===================================
 # DATABASE FILES (if using local DB)
@@ -101,10 +107,18 @@ pip-delete-this-directory.txt
 htmlcov/
 *.cover
 .hypothesis/
+ml-service/__pycache__/
+ml-service/*.pyc
+ml-service/models/
+ml-service/.pytest_cache/
 
 # ===================================
-# MISC
+# BROWSER AUTOMATION & TESTING
 # ===================================
+chromedriver*
+geckodriver*
+selenium-*.jar
+*.crx
 .cache/
 .parcel-cache/
 .eslintcache
@@ -113,3 +127,11 @@ htmlcov/
 *.pid.lock
 .npm
 .yarn-integrity
+
+# ===================================
+# MISC
+# ===================================
+*.bak
+*.backup
+*.old
+.vscode-test/

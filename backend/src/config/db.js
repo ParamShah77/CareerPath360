@@ -1,8 +1,10 @@
 const mongoose = require('mongoose');
+const getMongoUri = require('./getMongoUri');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
+    const mongoUri = getMongoUri();
+    const conn = await mongoose.connect(mongoUri, {
       // These options are no longer needed in Mongoose 6+
       // useNewUrlParser: true,
       // useUnifiedTopology: true,
@@ -35,7 +37,7 @@ const connectDB = async () => {
     console.error('❌ MongoDB Connection Error:', error.message);
     console.error('💡 Make sure:');
     console.error('   1. MongoDB is running');
-    console.error('   2. MONGO_URI is correct in .env file');
+    console.error('   2. MONGO_URI or MONGODB_URI is correct in .env file');
     console.error('   3. Network/firewall is not blocking connection');
     process.exit(1);
   }

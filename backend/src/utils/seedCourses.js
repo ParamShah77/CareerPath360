@@ -1,6 +1,7 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
-require('dotenv').config();
+const getMongoUri = require('../config/getMongoUri');
 
 const courses = [
   // JavaScript & Frontend (10 courses)
@@ -965,7 +966,8 @@ const courses = [
 // Seed function remains the same
 const seedCourses = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const mongoUri = getMongoUri();
+    await mongoose.connect(mongoUri);
     console.log('✅ Connected to MongoDB');
 
     await Course.deleteMany({});

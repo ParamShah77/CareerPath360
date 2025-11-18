@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 require('dotenv').config();
+const bcrypt = require('bcryptjs');
+const getMongoUri = require('./src/config/getMongoUri');
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
+const mongoUri = getMongoUri();
+mongoose.connect(mongoUri)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
 

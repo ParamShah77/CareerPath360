@@ -52,6 +52,10 @@ const resumeSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+    filePath: {
+      type: String,
+      default: null
+    },
     uploadedAt: {
       type: Date,
       default: Date.now

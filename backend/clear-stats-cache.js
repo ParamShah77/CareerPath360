@@ -2,10 +2,12 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./src/models/User');
+const getMongoUri = require('./src/config/getMongoUri');
 
 async function clearStatsCache() {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    const mongoUri = getMongoUri();
+    await mongoose.connect(mongoUri);
     console.log('📊 Connected to MongoDB');
 
     // Find user and check stats

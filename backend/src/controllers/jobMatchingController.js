@@ -2,8 +2,12 @@ const JobAnalysis = require('../models/JobAnalysis');
 const Resume = require('../models/Resume');
 const Course = require('../models/Course');
 const axios = require('axios');
-const cheerio = require('cheerio');
+const fs = require('fs');
+const path = require('path');
+const JSON5 = require('json5');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { scrapeJobPosting } = require('../services/jobScraper');
+const { applyFallbackParsing } = require('../services/fallbackResumeAnalyzer');
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -50,7 +54,7 @@ exports.analyzeJobPosting = async (req, res) => {
 
     // Extract user skills from resume
     let userSkills = [];
-    if (resume.parsedData?.extracted_skills) {
+    if (resume.parsedData?.extracted_skills?.length) {
       userSkills = resume.parsedData.extracted_skills;
     } else if (resume.builtResumeData?.skills) {
       const skillsData = resume.builtResumeData.skills;
@@ -61,18 +65,23 @@ exports.analyzeJobPosting = async (req, res) => {
       ];
     }
 
+    if (userSkills.length === 0) {
+      userSkills = await hydrateResumeSkills(resume);
+    }
+
     console.log('✅ User skills extracted:', userSkills.length);
 
     // Scrape job posting
     let jobData;
     try {
       jobData = await scrapeJobPosting(jobUrl);
-      console.log('✅ Job posting scraped:', jobData.jobTitle);
+      console.log(`✅ Job posting scraped via ${jobData.scrapeStrategy}:`, jobData.jobTitle);
     } catch (error) {
       console.error('❌ Error scraping job:', error);
       return res.status(400).json({
         status: 'error',
-        message: 'Failed to fetch job posting. Please check the URL.'
+        message: 'Failed to fetch job posting. Please check the URL.',
+        hint: error.message
       });
     }
 
@@ -81,6 +90,7 @@ exports.analyzeJobPosting = async (req, res) => {
     console.log('✅ AI analysis completed');
 
     // Calculate match score with advanced algorithm
+    const atsScoreMeta = extractAtsScore(resume);
     const matchResult = calculateMatchScore(
       userSkills,
       aiAnalysis.matchingSkills,
@@ -91,7 +101,8 @@ exports.analyzeJobPosting = async (req, res) => {
         experience: jobData.experience,
         jobDescription: jobData.jobDescription
       },
-      resume
+      resume,
+      atsScoreMeta.value
     );
 
     console.log('📊 Match Score Breakdown:', matchResult);
@@ -106,6 +117,8 @@ exports.analyzeJobPosting = async (req, res) => {
       jobTitle: jobData.jobTitle,
       companyName: jobData.companyName,
       jobDescription: jobData.jobDescription,
+      jobBoard: jobData.jobBoard,
+      scrapeStrategy: jobData.scrapeStrategy,
       requiredSkills: aiAnalysis.requiredSkills,
       preferredSkills: aiAnalysis.preferredSkills,
       experience: jobData.experience,
@@ -123,7 +136,9 @@ exports.analyzeJobPosting = async (req, res) => {
       strengths: aiAnalysis.strengths,
       areasToImprove: aiAnalysis.areasToImprove,
       aiAnalysis: aiAnalysis.summary,
-      resumeUsed: resume._id
+      resumeUsed: resume._id,
+      atsScoreSnapshot: atsScoreMeta.value,
+      atsScoreSource: atsScoreMeta.source
     });
 
     await jobAnalysis.save();
@@ -150,6 +165,8 @@ exports.analyzeJobPosting = async (req, res) => {
 // @route   POST /api/job-matching/analyze-with-upload
 // @access  Private
 exports.analyzeWithUpload = async (req, res) => {
+  let savedFileMeta = null;
+  let resume = null;
   try {
     const { jobUrl } = req.body;
     const userId = req.user.id;
@@ -176,14 +193,17 @@ exports.analyzeWithUpload = async (req, res) => {
     console.log('📊 Analyzing job with uploaded resume:', file.originalname);
     console.log('📊 Job URL:', jobUrl);
 
+    // Persist file from memory storage to disk
+    savedFileMeta = await persistUploadedFile(file);
+
     // Create resume record
-    const resume = new Resume({
+    resume = new Resume({
       userId,
       originalName: file.originalname,
-      fileName: file.filename,
-      filePath: file.path,
+      fileName: savedFileMeta.fileName,
+      filePath: savedFileMeta.path,
       fileSize: file.size,
-      fileType: file.mimetype.split('/')[1],
+      fileType: savedFileMeta.fileType,
       uploadedAt: new Date(),
       isBuiltResume: false
     });
@@ -191,10 +211,9 @@ exports.analyzeWithUpload = async (req, res) => {
     // Call ML service to parse the resume
     try {
       const FormData = require('form-data');
-      const fs = require('fs');
       
       const formData = new FormData();
-      formData.append('file', fs.createReadStream(file.path), {
+      formData.append('file', fs.createReadStream(savedFileMeta.path), {
         filename: file.originalname,
         contentType: file.mimetype
       });
@@ -218,8 +237,15 @@ exports.analyzeWithUpload = async (req, res) => {
       );
 
       if (mlResponse.data) {
-        resume.parsedData = mlResponse.data;
+        // ML service returns { success: true, data: {...} } format
+        const mlData = mlResponse.data.success ? mlResponse.data.data : mlResponse.data;
+        resume.parsedData = mlData;
+        resume.parseStatus = 'completed';
+        resume.atsScore = mlData?.final_ats_score || 0;
         console.log('✅ Resume parsed by ML service');
+        if (mlData?.extracted_skills?.length) {
+          console.log(`✅ Extracted ${mlData.extracted_skills.length} skills from ML service`);
+        }
       }
     } catch (mlError) {
       console.error('⚠️ ML parsing failed, saving without parsed data:', mlError.message);
@@ -231,25 +257,7 @@ exports.analyzeWithUpload = async (req, res) => {
 
     // Extract user skills from the newly uploaded resume
     let userSkills = [];
-    if (resume.parsedData?.extracted_skills) {
-      userSkills = resume.parsedData.extracted_skills;
-      console.log('✅ Skills from ML parsing:', userSkills.length);
-    } else {
-      // Fallback: Try to extract skills using AI from raw text
-      console.log('⚠️ No ML parsed skills, attempting AI extraction from file');
-      try {
-        const extractedSkills = await extractSkillsFromFile(resume.filePath);
-        if (extractedSkills && extractedSkills.length > 0) {
-          userSkills = extractedSkills;
-          // Store in parsedData for future reference
-          resume.parsedData = { extracted_skills: extractedSkills };
-          await resume.save();
-          console.log('✅ Skills extracted via AI:', userSkills.length);
-        }
-      } catch (extractError) {
-        console.error('⚠️ AI skill extraction failed:', extractError.message);
-      }
-    }
+    userSkills = await hydrateResumeSkills(resume);
 
     if (userSkills.length === 0) {
       console.warn('⚠️ No skills found in resume - analysis will be limited');
@@ -259,15 +267,16 @@ exports.analyzeWithUpload = async (req, res) => {
     let jobData;
     try {
       jobData = await scrapeJobPosting(jobUrl);
-      console.log('✅ Job posting scraped:', jobData.jobTitle);
+      console.log(`✅ Job posting scraped via ${jobData.scrapeStrategy}:`, jobData.jobTitle);
     } catch (error) {
       console.error('❌ Error scraping job:', error);
       
       // Delete the uploaded resume if job scraping fails to avoid orphaned resumes
-      await Resume.findByIdAndDelete(resume._id);
-      const fs = require('fs');
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
+      if (resume?._id) {
+        await Resume.findByIdAndDelete(resume._id);
+      }
+      if (savedFileMeta?.path) {
+        safeDeleteFile(savedFileMeta.path);
       }
       
       return res.status(400).json({
@@ -284,6 +293,7 @@ exports.analyzeWithUpload = async (req, res) => {
     console.log('✅ AI analysis completed');
 
     // Calculate match score with advanced algorithm
+    const atsScoreMeta = extractAtsScore(resume);
     const matchResult = calculateMatchScore(
       userSkills,
       aiAnalysis.matchingSkills,
@@ -294,7 +304,8 @@ exports.analyzeWithUpload = async (req, res) => {
         experience: jobData.experience,
         jobDescription: jobData.jobDescription
       },
-      resume
+      resume,
+      atsScoreMeta.value
     );
 
     console.log('📊 Match Score Breakdown:', matchResult);
@@ -309,6 +320,8 @@ exports.analyzeWithUpload = async (req, res) => {
       jobTitle: jobData.jobTitle,
       companyName: jobData.companyName,
       jobDescription: jobData.jobDescription,
+      jobBoard: jobData.jobBoard,
+      scrapeStrategy: jobData.scrapeStrategy,
       requiredSkills: aiAnalysis.requiredSkills,
       preferredSkills: aiAnalysis.preferredSkills,
       experience: jobData.experience,
@@ -326,7 +339,9 @@ exports.analyzeWithUpload = async (req, res) => {
       strengths: aiAnalysis.strengths,
       areasToImprove: aiAnalysis.areasToImprove,
       aiAnalysis: aiAnalysis.summary,
-      resumeUsed: resume._id
+      resumeUsed: resume._id,
+      atsScoreSnapshot: atsScoreMeta.value,
+      atsScoreSource: atsScoreMeta.source
     });
 
     await jobAnalysis.save();
@@ -342,6 +357,12 @@ exports.analyzeWithUpload = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Job analysis with upload error:', error);
+    if (resume?._id) {
+      await Resume.findByIdAndDelete(resume._id);
+    }
+    if (savedFileMeta?.path) {
+      safeDeleteFile(savedFileMeta.path);
+    }
     return res.status(500).json({
       status: 'error',
       message: 'Failed to analyze job posting with uploaded resume',
@@ -455,69 +476,6 @@ exports.deleteJobAnalysis = async (req, res) => {
 
 // ===== HELPER FUNCTIONS =====
 
-async function scrapeJobPosting(url) {
-  try {
-    // Set user agent to avoid blocking
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      },
-      timeout: 10000
-    });
-
-    const $ = cheerio.load(response.data);
-
-    // Generic scraping - will work for most job sites
-    let jobTitle = $('h1').first().text().trim() || 
-                   $('[class*="job-title"]').first().text().trim() ||
-                   $('[class*="title"]').first().text().trim() ||
-                   'Position';
-
-    let companyName = $('[class*="company"]').first().text().trim() ||
-                      $('[class*="employer"]').first().text().trim() ||
-                      null;
-
-    // Get all text content
-    const bodyText = $('body').text();
-    
-    // Extract job description (main content)
-    let jobDescription = $('article').text().trim() ||
-                        $('[class*="description"]').text().trim() ||
-                        $('main').text().trim() ||
-                        bodyText.substring(0, 5000);
-
-    // Try to extract location
-    let location = $('[class*="location"]').first().text().trim() || null;
-
-    // Try to extract experience
-    let experience = null;
-    const expMatch = bodyText.match(/(\d+[\+]?\s*(?:to|-)\s*\d+|[\d+]+)\s*(?:years?|yrs?)\s*(?:of\s*)?(?:experience)?/i);
-    if (expMatch) {
-      experience = expMatch[0];
-    }
-
-    // Try to extract salary
-    let salary = null;
-    const salaryMatch = bodyText.match(/(?:₹|Rs\.?|INR|USD|\$)\s*[\d,]+(?:\s*-\s*[\d,]+)?(?:\s*(?:LPA|PA|per\s*annum|annually))?/i);
-    if (salaryMatch) {
-      salary = salaryMatch[0];
-    }
-
-    return {
-      jobTitle,
-      companyName,
-      jobDescription,
-      location,
-      experience,
-      salary
-    };
-
-  } catch (error) {
-    console.error('Scraping error:', error.message);
-    throw new Error('Failed to scrape job posting');
-  }
-}
-
 async function analyzeWithAI(jobData, userSkills, resume) {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -555,15 +513,8 @@ Provide ONLY the JSON response, no additional text.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    const text = response.text();
 
-    // Parse JSON response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to parse AI response');
-    }
-
-    const analysis = JSON.parse(jsonMatch[0]);
+    const analysis = parseGeminiJson(response.text());
     return analysis;
 
   } catch (error) {
@@ -599,7 +550,14 @@ Provide ONLY the JSON response, no additional text.`;
  * - 50-64: Fair Match (Top 50%)
  * - Below 50: Weak Match
  */
-function calculateMatchScore(userSkills, matchingSkills, missingSkills, jobData = {}, resume = {}) {
+function calculateMatchScore(
+  userSkills,
+  matchingSkills,
+  missingSkills,
+  jobData = {},
+  resume = {},
+  atsScore = null
+) {
   if (!userSkills || userSkills.length === 0) {
     return {
       score: 0,
@@ -766,19 +724,19 @@ function calculateMatchScore(userSkills, matchingSkills, missingSkills, jobData 
   // Determine grade
   let grade;
   if (totalScore >= 80) {
-    grade = 'Excellent Match';
+    grade = 'Excellent';
   } else if (totalScore >= 65) {
-    grade = 'Good Match';
+    grade = 'Good';
   } else if (totalScore >= 50) {
-    grade = 'Fair Match';
+    grade = 'Fair';
   } else if (totalScore >= 30) {
-    grade = 'Weak Match';
+    grade = 'Weak';
   } else {
-    grade = 'Poor Match';
+    grade = 'Poor';
   }
   
   // Generate insights
-  const insights = generateMatchInsights(scoreComponents, totalScore, missingSkills);
+  const insights = generateMatchInsights(scoreComponents, totalScore, missingSkills, atsScore);
   
   return {
     score: totalScore,
@@ -850,8 +808,18 @@ function extractIndustryKeywords(description) {
 }
 
 // Helper: Generate insights
-function generateMatchInsights(breakdown, totalScore, missingSkills) {
+function generateMatchInsights(breakdown, totalScore, missingSkills, atsScore = null) {
   const insights = [];
+
+  if (typeof atsScore === 'number') {
+    if (atsScore >= 80) {
+      insights.push(`✅ ATS-ready resume detected (${atsScore}%). Expect smooth parsing.`);
+    } else if (atsScore >= 65) {
+      insights.push(`👍 ATS score at ${atsScore}%. Minor tweaks can push it higher.`);
+    } else {
+      insights.push(`⚠️ ATS score is ${atsScore}%. Optimize formatting and keywords for better parsing.`);
+    }
+  }
   
   if (breakdown.requiredSkills >= 35) {
     insights.push('✅ Strong match on required skills - you meet most job requirements');
@@ -894,6 +862,31 @@ function generateMatchInsights(breakdown, totalScore, missingSkills) {
   return insights;
 }
 
+function extractAtsScore(resume = {}) {
+  if (!resume) {
+    return { value: null, source: null };
+  }
+
+  const sources = [
+    { value: resume.atsScore, source: 'resume' },
+    { value: resume.parsedData?.final_ats_score, source: 'ml-service' },
+    { value: resume.parsedData?.atsScore, source: 'ml-service' },
+    { value: resume.parsedData?.finalScore, source: 'ml-service' },
+    { value: resume.parsedData?.analysis?.finalScore, source: 'ml-service' }
+  ];
+
+  const match = sources.find(entry => typeof entry.value === 'number' && entry.value > 0);
+
+  if (match) {
+    return {
+      value: Math.round(match.value),
+      source: match.source
+    };
+  }
+
+  return { value: null, source: null };
+}
+
 async function getRecommendedCourses(missingSkills) {
   try {
     if (!missingSkills || missingSkills.length === 0) {
@@ -922,46 +915,117 @@ async function getRecommendedCourses(missingSkills) {
   }
 }
 
-// Helper function to extract skills from PDF using AI
-async function extractSkillsFromFile(filePath) {
-  try {
-    const pdf = require('pdf-parse');
-    const fs = require('fs');
-    
-    // Read PDF content
-    const dataBuffer = fs.readFileSync(filePath);
-    const pdfData = await pdf(dataBuffer);
-    const resumeText = pdfData.text;
-
-    if (!resumeText || resumeText.trim().length < 100) {
-      throw new Error('Unable to extract text from PDF');
-    }
-
-    // Use Gemini AI to extract skills
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const prompt = `Extract all technical skills, soft skills, and tools mentioned in this resume. Return ONLY a JSON array of skill names, nothing else.
-
-Resume Text:
-${resumeText.substring(0, 3000)}
-
-Return format: ["skill1", "skill2", "skill3", ...]`;
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    // Parse JSON array
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      const skills = JSON.parse(jsonMatch[0]);
-      return skills.filter(skill => skill && skill.length > 1);
-    }
-
-    return [];
-  } catch (error) {
-    console.error('Skill extraction error:', error.message);
-    return [];
+async function persistUploadedFile(file) {
+  if (!file || !file.buffer) {
+    throw new Error('Invalid file buffer - ensure multer uses memory storage');
   }
+
+  const uploadsDir = path.join(__dirname, '../../uploads/resumes');
+  await fs.promises.mkdir(uploadsDir, { recursive: true });
+
+  const fallbackExt = file.mimetype === 'application/pdf' ? '.pdf' : '.docx';
+  const safeOriginal = sanitizeFilename(file.originalname, fallbackExt);
+  const uniqueSuffix = Math.random().toString(36).slice(2, 8);
+  const storedName = `${Date.now()}-${uniqueSuffix}-${safeOriginal}`;
+  const storedPath = path.join(uploadsDir, storedName);
+
+  await fs.promises.writeFile(storedPath, file.buffer);
+
+  const fileType = path.extname(storedName).replace('.', '') || file.mimetype?.split('/')[1] || 'pdf';
+
+  return {
+    path: storedPath,
+    fileName: storedName,
+    fileType
+  };
+}
+
+function sanitizeFilename(name = '', fallbackExt = '.pdf') {
+  const cleaned = name
+    ? name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    : `resume${fallbackExt}`;
+
+  if (path.extname(cleaned)) {
+    return cleaned;
+  }
+
+  return `${cleaned}${fallbackExt}`;
+}
+
+function safeDeleteFile(filePath) {
+  if (!filePath) return;
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (err) {
+    console.warn('⚠️ Unable to delete file:', filePath, err.message);
+  }
+}
+
+function parseGeminiJson(text) {
+  if (!text) {
+    throw new Error('Empty AI response');
+  }
+
+  const cleaned = text
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Failed to parse AI response - no JSON payload found');
+  }
+
+  const payload = jsonMatch[0];
+  try {
+    return JSON.parse(payload);
+  } catch (err) {
+    try {
+      return JSON5.parse(payload);
+    } catch (json5Error) {
+      console.error('AI JSON parse error:', json5Error.message);
+      throw err;
+    }
+  }
+}
+
+async function hydrateResumeSkills(resume) {
+  if (!resume) return [];
+
+  // Priority 1: Check ML-parsed skills
+  if (resume.parsedData?.extracted_skills?.length) {
+    return resume.parsedData.extracted_skills;
+  }
+
+  // Priority 2: Check built resume skills
+  if (resume.builtResumeData?.skills) {
+    const skillsData = resume.builtResumeData.skills;
+    const builtSkills = [
+      ...(skillsData.technical || []),
+      ...(skillsData.tools || []),
+      ...(skillsData.soft || [])
+    ];
+    if (builtSkills.length > 0) {
+      return builtSkills;
+    }
+  }
+
+  // Priority 3: Fallback parsing from file (only if filePath exists)
+  if (resume.filePath) {
+    try {
+      const fallbackData = await applyFallbackParsing(resume);
+      if (fallbackData?.extracted_skills?.length) {
+        return fallbackData.extracted_skills;
+      }
+    } catch (error) {
+      console.error('⚠️ Fallback analyzer failed:', error.message);
+    }
+  }
+
+  // Last resort: return empty array
+  return [];
 }
 
 module.exports = {

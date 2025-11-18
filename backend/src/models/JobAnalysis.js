@@ -36,6 +36,14 @@ const jobAnalysisSchema = new mongoose.Schema(
       type: String,
       default: null
     },
+    jobBoard: {
+      type: String,
+      default: null
+    },
+    scrapeStrategy: {
+      type: String,
+      default: 'axios'
+    },
     location: {
       type: String,
       default: null
@@ -100,6 +108,14 @@ const jobAnalysisSchema = new mongoose.Schema(
       default: []
     },
     aiAnalysis: {
+      type: String,
+      default: null
+    },
+    atsScoreSnapshot: {
+      type: Number,
+      default: null
+    },
+    atsScoreSource: {
       type: String,
       default: null
     },
